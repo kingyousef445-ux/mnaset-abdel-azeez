@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصة الأستاذ عبد العزيز عمر | رياضيات</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#14213d;--bg:#f6f4ee;--card:#fff;--ac:#e8a200;--mut:#667089;--ok:#12805c;--bad:#c93232;--bd:#d9dde8}
+*{box-sizing:border-box}
+body{margin:0;font-family:Cairo,Tahoma,sans-serif;color:var(--ink);background:var(--bg);
+background-image:linear-gradient(#e4e2d8 1px,transparent 1px),linear-gradient(90deg,#e4e2d8 1px,transparent 1px);background-size:28px 28px;min-height:100vh}
+header{background:var(--ink);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:4px solid var(--ac)}
+header b{font-size:1.15rem;font-weight:800}
+main{max-width:1000px;margin:20px auto;padding:0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:18px;margin-bottom:16px}
+h2,h3{margin:0 0 12px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;font:inherit;margin-bottom:10px;background:#fff}
+label{font-size:.88rem;color:var(--mut);display:block;margin-bottom:3px}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 16px;background:var(--ink);color:#fff;font-weight:600}
+button:hover{opacity:.9}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--ac)}
+.ac{background:var(--ac);color:var(--ink)}.rd{background:var(--bad)}.gr{background:var(--ok)}.sm{padding:5px 10px;font-size:.82rem}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{background:#fff;color:var(--ink);border:1px solid var(--bd)}.tabs .on{background:var(--ink);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{padding:9px 8px;border-bottom:1px solid var(--bd);text-align:right;vertical-align:top}
+th{background:#eef0f6}
+.wrap{overflow-x:auto}
+.msg{padding:10px 14px;border-radius:8px;margin-bottom:12px;background:#fff6dc;border:1px solid var(--ac)}
+.err{color:var(--bad);font-weight:600;min-height:1.3em}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 12px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.78rem;background:#eef0f6}
+.q{border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px;background:#fff}
+.opt{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;margin:4px 0;border:1px solid var(--bd)}
+.opt input{width:auto;margin:0}
+.opt.right{background:#e0f5ec;border-color:var(--ok)}.opt.wrong{background:#fde6e6;border-color:var(--bad)}
+.timer{position:sticky;top:0;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:800;z-index:5;margin-bottom:12px;display:flex;justify-content:space-between}
+.zs{overflow:auto;max-height:520px;border:1px solid var(--bd);border-radius:8px;margin:8px 0;background:#fafafa}
+.zs img{display:block;width:100%}.zs iframe{border:0;width:100%;height:600px}
+video,.vid{width:100%;max-height:520px;border-radius:8px;background:#000;border:0;aspect-ratio:16/9}
+.big{font-size:2.4rem;font-weight:800;color:var(--ok)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const GR=["الأول الإعدادي","الثاني الإعدادي","الثالث الإعدادي","الأول الثانوي","الثاني الثانوي","بكالوريوس"];
+const ADMIN_PASS="55555";
+const $=s=>document.querySelector(s),$v=id=>(document.getElementById(id)||{}).value||"";
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const code=()=>String(Math.floor(100000+Math.random()*900000));
+let db={students:[],items:[],attempts:[],views:[],alerts:[]},me=localStorage.getItem("mp_me")||null;
+let view="dash",P=null,at="login",tb="stu",T=null,msg="";
+
+/* ---------- التخزين (IndexedDB) ---------- */
+const idb=()=>new Promise(r=>{const q=indexedDB.open("mathplat",1);q.onupgradeneeded=()=>q.result.createObjectStore("k");q.onsuccess=()=>r(q.result)});
+async function load(){const d=await idb();return new Promise(r=>{const g=d.transaction("k").objectStore("k").get("db");g.onsuccess=()=>{if(g.result)db=g.result;r()};g.onerror=()=>r()})}
+async function save(){const d=await idb();d.transaction("k","readwrite").objectStore("k").put(db,"db")}
+
+const S=()=>db.students.find(x=>x.id===me);
+const item=id=>db.items.find(x=>x.id===id);
+const myAtt=(sid,iid)=>db.attempts.find(a=>a.s===sid&&a.i===iid);
+const mine=i=>i.codes.some(c=>c.by===me);
+function go(v,p){clearInterval(T);view=v;P=p;render()}
+function logout(){me=null;localStorage.removeItem("mp_me");at="login";msg="";render()}
+
+/* ---------- الواجهة ---------- */
+function head(){return `<header><b>📐 منصة الأستاذ عبد العزيز عمر — رياضيات</b>${me?`<span>${me==="admin"?"الأستاذ (أدمن)":esc(S()?.name)} <button class="sm ac" onclick="logout()">تسجيل خروج</button></span>`:""}</header>`}
+function render(){
+  let h=head()+"<main>";
+  if(!me)h+=authV();
+  else if(me==="admin")h+=view==="editor"?editorV():adminV();
+  else h+=studentV();
+  $("#app").innerHTML=h+"</main>";
+  if(view==="exam"&&me!=="admin"&&P){const a=myAtt(me,P);if(a&&!a.done)startTimer(a)}
+}
+function viewer(f){
+  if(!f)return"";const u=URL.createObjectURL(f);
+  const el=f.type==="application/pdf"?`<iframe src="${u}"></iframe>`:`<img src="${u}" alt="">`;
+  return `<div><button class="sm" onclick="zm(this,.25)">＋ تكبير</button> <button class="sm" onclick="zm(this,-.25)">－ تصغير</button><div class="zs">${el}</div></div>`;
+}
+function zm(b,d){const c=b.parentElement.querySelector(".zs").firstElementChild;const z=Math.max(.5,(+c.dataset.z||1)+d);c.dataset.z=z;c.style.width=z*100+"%";c.style.maxWidth="none";if(c.tagName==="IFRAME")c.style.height=600*z+"px"}
+
+/* ---------- الدخول والتسجيل ---------- */
+function authV(){
+  const t=(k,l)=>`<button class="${at===k?"on":""}" onclick="at='${k}';msg='';render()">${l}</button>`;
+  let f="";
+  if(at==="login")f=`<label>رقم التليفون</label><input id="lp" inputmode="numeric"><label>الباسورد</label><input id="lw" type="password"><button class="ac" onclick="doLogin()">دخول</button>`;
+  if(at==="adm")f=`<label>باسورد الأستاذ</label><input id="aw" type="password" autocomplete="off"><button class="ac" onclick="doAdmin()">دخول الأستاذ</button>`;
+  if(at==="reg")f=`<label>الاسم ثلاثي</label><input id="rn"><div class="row"><div><label>رقم تليفون الطالب</label><input id="rp" inputmode="numeric"></div><div><label>رقم تليفون ولي الأمر</label><input id="rg" inputmode="numeric"></div></div><div class="row"><div><label>الباسورد</label><input id="rw" type="password"></div><div><label>المرحلة الدراسية</label><select id="rr">${GR.map(g=>`<option>${g}</option>`).join("")}</select></div></div><button class="ac" onclick="doReg()">إنشاء حساب</button>`;
+  return `<div class="card" style="max-width:560px;margin:30px auto"><h2>أهلاً بك في المنصة</h2><div class="tabs">${t("login","دخول طالب")}${t("reg","حساب جديد")}${t("adm","دخول الأستاذ")}</div><div class="err" id="er">${esc(msg)}</div>${f}</div>`;
+}
+const er=m=>{msg=m;const e=$("#er");if(e)e.textContent=m};
+async function doReg(){
+  const n=$v("rn").trim().replace(/\s+/g," "),p=$v("rp").trim(),g=$v("rg").trim(),w=$v("rw");
+  if(n.split(" ").length<3)return er("اكتب الاسم ثلاثي");
+  if(!/^\d{11}$/.test(p)||!/^\d{11}$/.test(g))return er("رقم التليفون لازم يكون 11 رقم");
+  if(p===g)return er("رقم ولي الأمر لازم يختلف عن رقم الطالب");
+  if(w.length<4)return er("الباسورد 4 أحرف أو أرقام على الأقل");
+  if(db.students.some(s=>s.phone===p))return er("الرقم ده مسجل قبل كده");
+  const s={id:uid(),name:n,phone:p,parent:g,pass:w,grade:$v("rr"),at:Date.now()};
+  db.students.push(s);await save();me=s.id;localStorage.setItem("mp_me",me);view="dash";render();
+}
+function doLogin(){
+  const s=db.students.find(x=>x.phone===$v("lp").trim()&&x.pass===$v("lw"));
+  if(!s)return er("الرقم أو الباسورد غلط");
+  me=s.id;localStorage.setItem("mp_me",me);view="dash";render();
+}
+function doAdmin(){
+  if($v("aw")!==ADMIN_PASS)return er("الباسورد غلط");
+  me="admin";localStorage.setItem("mp_me",me);tb="stu";view="dash";render();
+}
+
+/* ---------- الطالب ---------- */
+function studentV(){
+  const s=S();if(!s){logout();return""}
+  if(view==="lesson")return lessonV(item(P));
+  if(view==="hw")return hwV(item(P));
+  if(view==="exam")return examV(item(P));
+  if(view==="review")return reviewV(P);
+  const its=db.items.filter(i=>mine(i)&&(i.type!=="exam"||i.pub)&&i.grade===s.grade);
+  const al=db.alerts.map(a=>`<div class="msg">📢 ${esc(a.t)}</div>`).join("");
+  const kind={lesson:"حصة",hw:"واجب",exam:"امتحان"};
+  const rows=its.map(i=>{
+    const a=i.type==="exam"?myAtt(me,i.id):null;let act="",res="—";
+    if(i.type==="lesson")act=`<button class="sm" onclick="openLesson('${i.id}')">▶ مشاهدة</button>`;
+    if(i.type==="hw")act=`<button class="sm" onclick="go('hw','${i.id}')">عرض الواجب</button>`;
+    if(i.type==="exam"){
+      if(a?.done){act=`<button class="sm gr" onclick="go('review','${a.id}')">مراجعة الإجابات</button>`;res=`${a.score} / ${a.total}`}
+      else act=`<button class="sm ac" onclick="go('exam','${i.id}')">${a?"إكمال الامتحان":"دخول الامتحان"}</button>`;
+    }
+    return `<tr><td><span class="tag">${kind[i.type]}</span></td><td>${esc(i.title)}</td><td>${act}</td><td>${res}</td></tr>`;
+  }).join("");
+  return `${al}<div class="card"><h3>أهلاً ${esc(s.name.split(" ")[0])} — ${esc(s.grade)}</h3>
+  <label>اكتب الكود اللي أخدته من المستر</label><div style="display:flex;gap:8px"><input id="cd" inputmode="numeric" style="margin:0"><button class="ac" onclick="redeem()">تفعيل</button></div><div class="err" id="er">${esc(msg)}</div></div>
+  <div class="card"><h3>حصصي وواجباتي وامتحاناتي</h3><div class="wrap"><table><tr><th>النوع</th><th>العنوان</th><th>الإجراء</th><th>النتيجة</th></tr>${rows||`<tr><td colspan="4">مفيش حاجة لسه — اكتب كود عشان تفتح حصة أو امتحان.</td></tr>`}</table></div></div>`;
+}
+async function redeem(){
+  const c=$v("cd").trim(),s=S();
+  const i=db.items.find(x=>x.codes.some(k=>k.c===c));
+  if(!i)return er("الكود غلط");
+  const k=i.codes.find(k=>k.c===c);
+  if(i.grade!==s.grade)return er("الكود ده لمرحلة تانية");
+  if(k.by&&k.by!==me)return er("الكود ده اتستخدم على حساب تاني");
+  k.by=me;await save();msg="";render();
+}
+async function openLesson(id){db.views.push({s:me,i:id,t:Date.now()});await save();go("lesson",id)}
+function back(){return `<button class="sm" onclick="go('dash')">← رجوع</button>`}
+function lessonV(i){
+  let v="";
+  if(i.file)v=`<video id="lv" controls playsinline preload="metadata" controlsList="nodownload" onloadedmetadata="this.muted=false;this.volume=1" onplay="chkAudio(this)" src="${URL.createObjectURL(i.file)}"></video>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><button class="sm ac" onclick="unmute()">🔊 تشغيل الصوت</button><span>مستوى الصوت</span><input type="range" min="0" max="1" step="0.05" value="1" style="width:160px;margin:0" oninput="setVol(this.value)"></div><div id="au" class="err"></div>`;
+  else if(i.url){const m=i.url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);v=m?`<iframe class="vid" src="https://www.youtube.com/embed/${m[1]}" allowfullscreen></iframe>`:`<video controls src="${esc(i.url)}"></video>`}
+  return `<div class="card">${back()}<h2 style="margin-top:12px">${esc(i.title)}</h2>${v||"لا يوجد فيديو"}</div>`;
+}
+function unmute(){const v=document.getElementById("lv");if(v){v.muted=false;v.volume=1;v.play().catch(()=>{})}}
+function setVol(x){const v=document.getElementById("lv");if(v){v.muted=false;v.volume=+x}}
+function chkAudio(v){
+  v.muted=false;if(v.volume===0)v.volume=1;
+  setTimeout(()=>{
+    const noAudio=(v.mozHasAudio===false)||(v.webkitAudioDecodedByteCount===0)||(v.audioTracks&&v.audioTracks.length===0);
+    const m=document.getElementById("au");
+    if(noAudio&&!v.paused&&m)m.textContent="⚠️ المتصفح مش قادر يقرأ صوت الفيديو ده. حوّله لصيغة MP4 (H.264 + AAC) وارفعه تاني.";
+  },2500);
+}
+function hwV(i){return `<div class="card">${back()}<h2 style="margin-top:12px">واجب: ${esc(i.title)}</h2><p style="white-space:pre-wrap;line-height:1.9">${esc(i.text)}</p></div>`}
+
+/* ---------- الامتحان (طالب) ---------- */
+function examV(i){
+  const a=myAtt(me,i.id);
+  if(a?.done){go("review",a.id);return""}
+  if(!a)return `<div class="card">${back()}<h2 style="margin-top:12px">${esc(i.title)}</h2>
+  <p>عدد الأسئلة: ${i.qs.length} — الوقت: ${i.dur} دقيقة</p>
+  <div class="msg">⚠️ تنبيه: أول ما تدخل الامتحان مش هتقدر تخرج منه ولا تدخله تاني. لما الوقت يخلص الامتحان بيتقفل ونتيجتك بتظهر فورًا.</div>
+  <button class="ac" onclick="startExam('${i.id}')">أنا فاهم — ابدأ الامتحان</button></div>`;
+  const qs=i.qs.map((q,n)=>`<div class="q"><b>سؤال ${n+1}:</b> ${esc(q.text)}${viewer(q.file)}${q.opts.map((o,k)=>`<label class="opt"><input type="radio" name="q${q.id}" ${a.ans[q.id]===k?"checked":""} onchange="setAns('${a.id}','${q.id}',${k})">${esc(o)}</label>`).join("")}</div>`).join("");
+  return `<div class="timer"><span>${esc(i.title)}</span><span id="tm">--:--</span></div>${qs}<button class="gr" onclick="if(confirm('تسليم الامتحان؟ مش هتقدر تعدّل بعد كده.'))finish('${a.id}')">تسليم الامتحان</button>`;
+}
+async function startExam(id){
+  const i=item(id);if(myAtt(me,id))return render();
+  db.attempts.push({id:uid(),s:me,i:id,start:Date.now(),ans:{},done:false});await save();render();
+}
+async function setAns(aid,q,k){db.attempts.find(a=>a.id===aid).ans[q]=k;await save()}
+function startTimer(a){
+  const i=item(a.i),end=a.start+i.dur*60000;
+  const tick=()=>{const l=end-Date.now();if(l<=0){clearInterval(T);finish(a.id);return}
+    const e=$("#tm");if(e){const m=Math.floor(l/60000),s=Math.floor(l%60000/1000);e.textContent=`⏱ ${m}:${String(s).padStart(2,"0")}`}};
+  tick();T=setInterval(tick,1000);
+}
+async function finish(aid){
+  clearInterval(T);const a=db.attempts.find(x=>x.id===aid);if(a.done)return;
+  const i=item(a.i);a.score=i.qs.filter(q=>a.ans[q.id]===q.ans).length;a.total=i.qs.length;a.done=true;a.end=Date.now();
+  await save();view="review";P=aid;render();
+}
+window.addEventListener("beforeunload",e=>{if(me&&me!=="admin"&&view==="exam"){const a=P&&myAtt(me,P);if(a&&!a.done){e.preventDefault();e.returnValue=""}}});
+function reviewV(aid){
+  const a=db.attempts.find(x=>x.id===aid),i=item(a.i);
+  const qs=i.qs.map((q,n)=>`<div class="q"><b>سؤال ${n+1}:</b> ${esc(q.text)}${viewer(q.file)}${q.opts.map((o,k)=>{
+    const c=k===q.ans?"right":(a.ans[q.id]===k?"wrong":"");
+    return `<div class="opt ${c}">${c==="right"?"✔":c==="wrong"?"✘":"•"} ${esc(o)}${a.ans[q.id]===k?" <small>(إجابتك)</small>":""}</div>`}).join("")}${a.ans[q.id]===undefined?'<small class="err">لم تُجب عن هذا السؤال</small>':""}</div>`).join("");
+  return `<div class="card">${back()}<h2 style="margin-top:12px">نتيجتك في: ${esc(i.title)}</h2><div class="big">${a.score} / ${a.total}</div><p>الإجابة الصحيحة باللون الأخضر، وإجابتك الغلط باللون الأحمر.</p></div>${qs}`;
+}
+
+/* ---------- الأدمن ---------- */
+function adminV(){
+  const t=(k,l)=>`<button class="${tb===k?"on":""}" onclick="tb='${k}';render()">${l}</button>`;
+  const body={stu:stuT,lesson:()=>itemsT("lesson"),hw:()=>itemsT("hw"),exam:()=>itemsT("exam"),alert:alertT}[tb]();
+  return `<div class="tabs">${t("stu","الطلاب والمتابعة")}${t("lesson","الحصص")}${t("hw","الواجبات")}${t("exam","الامتحانات")}${t("alert","التنبيهات")}</div>${body}`;
+}
+function stuT(){
+  const exams=db.items.filter(i=>i.type==="exam");
+  const rows=db.students.map(s=>{
+    const seen=[...new Set(db.views.filter(v=>v.s===s.id).map(v=>v.i))].map(id=>item(id)?.title).filter(Boolean);
+    const ex=exams.map(e=>{const a=myAtt(s.id,e.id);return `${esc(e.title)}: ${a?(a.done?`✔ ${a.score}/${a.total}`:"بدأ ولم يُسلّم"):"لم يحل"}`}).join("<br>");
+    return `<tr><td>${esc(s.name)}</td><td>${s.phone}</td><td>${s.parent}</td><td>${esc(s.grade)}</td><td>${seen.length?seen.map(esc).join("، "):"—"}</td><td>${ex||"—"}</td><td><button class="sm rd" onclick="delStu('${s.id}')">حذف</button></td></tr>`;
+  }).join("");
+  return `<div class="card"><h3>الطلاب (${db.students.length})</h3><div class="wrap"><table><tr><th>الاسم</th><th>الطالب</th><th>ولي الأمر</th><th>المرحلة</th><th>الحصص اللي شافها</th><th>الامتحانات</th><th></th></tr>${rows||`<tr><td colspan="7">لا يوجد طلاب بعد.</td></tr>`}</table></div></div>`;
+}
+async function delStu(id){
+  if(!confirm("حذف حساب الطالب نهائيًا؟"))return;
+  db.students=db.students.filter(s=>s.id!==id);db.attempts=db.attempts.filter(a=>a.s!==id);db.views=db.views.filter(v=>v.s!==id);
+  db.items.forEach(i=>i.codes.forEach(c=>{if(c.by===id)c.by=null}));await save();render();
+}
+function itemsT(type){
+  const names={lesson:"حصة",hw:"واجب",exam:"امتحان"};
+  const gsel=`<label>المرحلة</label><select id="ng">${GR.map(g=>`<option>${g}</option>`).join("")}</select>`;
+  let form=`<label>العنوان</label><input id="nt">${gsel}`;
+  if(type==="lesson")form+=`<label>ملف الفيديو (من الجهاز)</label><input id="nf" type="file" accept="video/*"><label>أو رابط فيديو (يوتيوب / mp4)</label><input id="nu" placeholder="https://...">`;
+  if(type==="hw")form+=`<label>نص الواجب</label><textarea id="nx" rows="4"></textarea>`;
+  if(type==="exam")form+=`<label>مدة الامتحان بالدقايق</label><input id="nd" type="number" min="1" value="30">`;
+  const rows=db.items.filter(i=>i.type===type).map(i=>{
+    const cs=i.codes.map(c=>`<div><b>${c.c}</b> — ${c.by?esc(db.students.find(s=>s.id===c.by)?.name||"؟"):"غير مستخدم"}</div>`).join("");
+    return `<tr><td>${esc(i.title)}${type==="exam"?`<br><small>${i.qs.length} سؤال — ${i.dur} د — ${i.pub?"✔ منشور":"غير منشور"}</small>`:""}</td><td>${esc(i.grade)}</td><td>${cs||"—"}<button class="sm" onclick="addCode('${i.id}')">＋ كود</button></td><td>${type==="exam"?`<button class="sm ac" onclick="go('editor','${i.id}')">تعديل</button> <button class="sm ${i.pub?"":"gr"}" onclick="togPub('${i.id}')">${i.pub?"إلغاء النشر":"نشر"}</button> `:""}<button class="sm rd" onclick="delItem('${i.id}')">حذف</button></td></tr>`;
+  }).join("");
+  return `<div class="card"><h3>إضافة ${names[type]} جديد</h3>${form}<div class="err" id="er"></div><button class="ac" onclick="addItem('${type}')">إضافة</button></div>
+  <div class="card"><h3>قائمة (${names[type]})</h3><p style="color:var(--mut);font-size:.88rem">كل كود يتفعّل على حساب طالب واحد بس، ومفيش حاجة بتظهر لأي طالب غير اللي فعّل الكود.</p><div class="wrap"><table><tr><th>العنوان</th><th>المرحلة</th><th>الأكواد</th><th></th></tr>${rows||`<tr><td colspan="4">لا يوجد.</td></tr>`}</table></div></div>`;
+}
+async function addItem(type){
+  const t=$v("nt").trim();if(!t)return er("اكتب العنوان");
+  const i={id:uid(),type,title:t,grade:$v("ng"),codes:[{c:code(),by:null}]};
+  if(type==="lesson"){const f=$("#nf").files[0];i.file=f||null;i.url=$v("nu").trim();if(!f&&!i.url)return er("ارفع فيديو أو اكتب رابط")}
+  if(type==="hw"){i.text=$v("nx").trim();if(!i.text)return er("اكتب نص الواجب")}
+  if(type==="exam"){i.dur=Math.max(1,+$v("nd")||30);i.qs=[];i.pub=false}
+  db.items.push(i);await save();type==="exam"?go("editor",i.id):render();
+}
+async function addCode(id){item(id).codes.push({c:code(),by:null});await save();render()}
+async function togPub(id){const i=item(id);i.pub=!i.pub;await save();render()}
+async function delItem(id){
+  if(!confirm("حذف نهائي؟"))return;
+  db.items=db.items.filter(i=>i.id!==id);db.attempts=db.attempts.filter(a=>a.i!==id);db.views=db.views.filter(v=>v.i!==id);await save();render();
+}
+function alertT(){
+  const rows=db.alerts.map(a=>`<tr><td>${esc(a.t)}</td><td><button class="sm rd" onclick="delAlert('${a.id}')">حذف</button></td></tr>`).join("");
+  return `<div class="card"><h3>تنبيه جديد للطلاب</h3><textarea id="at" rows="3" placeholder="مثال: حصة السنتر يوم الخميس الساعة 5"></textarea><button class="ac" onclick="addAlert()">نشر التنبيه</button></div><div class="card"><table>${rows||"<tr><td>لا توجد تنبيهات.</td></tr>"}</table></div>`;
+}
+async function addAlert(){const t=$v("at").trim();if(!t)return;db.alerts.unshift({id:uid(),t});await save();render()}
+async function delAlert(id){db.alerts=db.alerts.filter(a=>a.id!==id);await save();render()}
+
+/* ---------- محرر الامتحان ---------- */
+function editorV(){
+  const i=item(P);
+  const qs=i.qs.map((q,n)=>`<div class="q"><b>سؤال ${n+1}:</b> ${esc(q.text)}${viewer(q.file)}${q.opts.map((o,k)=>`<div class="opt ${k===q.ans?"right":""}">${k===q.ans?"✔":"•"} ${esc(o)}</div>`).join("")}<button class="sm rd" onclick="delQ('${i.id}','${q.id}')">حذف السؤال</button></div>`).join("");
+  return `<div class="card"><button class="sm" onclick="go('dash')">← رجوع</button><h2 style="margin-top:12px">تعديل الامتحان</h2>
+  <div class="row"><div><label>عنوان الامتحان</label><input id="et" value="${esc(i.title)}" onchange="upd('${i.id}')"></div><div><label>المرحلة</label><select id="eg" onchange="upd('${i.id}')">${GR.map(g=>`<option ${g===i.grade?"selected":""}>${g}</option>`).join("")}</select></div><div><label>الوقت (دقيقة)</label><input id="ed" type="number" min="1" value="${i.dur}" onchange="upd('${i.id}')"></div></div>
+  <button class="${i.pub?"":"gr"}" onclick="togPub('${i.id}')">${i.pub?"إلغاء النشر":"نشر الامتحان"}</button></div>
+  <div class="card"><h3>إضافة سؤال</h3><label>نص السؤال</label><textarea id="qt" rows="2"></textarea><label>صورة أو ملف PDF (اختياري)</label><input id="qf" type="file" accept="image/*,application/pdf">
+  <label>الاختيارات (حدد الإجابة الصحيحة)</label>${[0,1,2,3].map(k=>`<div style="display:flex;gap:8px;align-items:center"><input type="radio" name="ca" value="${k}" ${k===0?"checked":""} style="width:auto;margin:0 0 10px"><input id="o${k}" placeholder="الاختيار ${k+1}"></div>`).join("")}
+  <div class="err" id="er"></div><button class="ac" onclick="addQ('${i.id}')">إضافة السؤال</button></div>${qs}`;
+}
+async function upd(id){const i=item(id);i.title=$v("et").trim()||i.title;i.grade=$v("eg");i.dur=Math.max(1,+$v("ed")||i.dur);await save()}
+async function addQ(id){
+  const i=item(id),o=[0,1,2,3].map(k=>$v("o"+k).trim()),f=$("#qf").files[0],t=$v("qt").trim();
+  if(!t&&!f)return er("اكتب السؤال أو ارفع صورة/PDF");
+  if(o.some(x=>!x))return er("املأ الاختيارات الأربعة");
+  i.qs.push({id:uid(),text:t,file:f||null,opts:o,ans:+document.querySelector('input[name=ca]:checked').value});
+  await save();render();
+}
+async function delQ(id,q){const i=item(id);i.qs=i.qs.filter(x=>x.id!==q);await save();render()}
+
+load().then(()=>{if(me&&me!=="admin"&&!S())logout();else render()});
+</script>
+</body>
+</html>
